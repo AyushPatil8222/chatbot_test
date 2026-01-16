@@ -55,7 +55,7 @@ def get_connection():
 # =========================================================
 def load_schema():
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(as_dict=True)
     cursor.execute("""
         SELECT TABLE_NAME, COLUMN_NAME
         FROM INFORMATION_SCHEMA.COLUMNS
@@ -64,26 +64,13 @@ def load_schema():
     """)
     
     schema = {}
-    rows = cursor.fetchall()
-    
-    print(f"DEBUG: Found {len(rows)} rows")  # Add this line
-    
-    for i, row in enumerate(rows):
-        try:
-            # ULTRA SAFE: Handle any row length
-            if len(row) >= 2:
-                table = str(row[0]).strip()
-                column = str(row[1]).strip()
-                if table and column:  # Only add non-empty values
-                    schema.setdefault(table, []).append(column)
-            else:
-                print(f"WARNING: Row {i} too short: {row}")
-        except Exception as e:
-            print(f"WARNING: Error processing row {i}: {e}, row={row}")
-            continue
+    for row in cursor.fetchall():
+        table = row.get('TABLE_NAME', '').strip()
+        column = row.get('COLUMN_NAME', '').strip()
+        if table and column:
+            schema.setdefault(table, []).append(column)
     
     conn.close()
-    print(f"SUCCESS: Loaded {len(schema)} tables")
     return schema
 
 
@@ -222,6 +209,7 @@ if __name__ == "__main__":
             print(f"\n❌ Error: {e}")
             import traceback
             traceback.print_exc()
+
 
 
 
