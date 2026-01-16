@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ['bash', 'nodejs', 'unixodbc.dev', 'msodbcsql18']
+
+[phases.build]
+nixPkgs = ['gcc', 'unixodbc.dev', 'msodbcsql18']
