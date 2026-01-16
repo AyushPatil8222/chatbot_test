@@ -59,15 +59,18 @@ def load_schema():
     cursor.execute("""
         SELECT TABLE_NAME, COLUMN_NAME
         FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME NOT LIKE 'sys%'
         ORDER BY TABLE_NAME, ORDINAL_POSITION
     """)
     schema = {}
-    for row in cursor.fetchall():  # ✅ FIXED: No unpacking
-        table = row[0]              # Index 0 = TABLE_NAME
-        column = row[1]             # Index 1 = COLUMN_NAME
+    
+    # ✅ FIXED: Explicit tuple unpacking
+    for (table, column) in cursor.fetchall():
         schema.setdefault(table, []).append(column)
+    
     conn.close()
     return schema
+
 
 # =========================================================
 # SANITIZE SQL
@@ -201,3 +204,4 @@ if __name__ == "__main__":
             print(f"\n❌ Error: {e}")
             import traceback
             traceback.print_exc()
+
