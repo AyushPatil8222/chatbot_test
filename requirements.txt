@@ -1,6 +1,4 @@
 chainlit==1.1.400
 groq==0.4.1
-pymssql==2.2.12
+pymssql==2.3.11
 python-dotenv==1.0.1
-
-
