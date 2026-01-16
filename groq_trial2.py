@@ -53,6 +53,7 @@ def get_connection():
 # =========================================================
 # LOAD SCHEMA - FIXED UNPACKING ERROR
 # =========================================================
+# FIXED load_schema()
 def load_schema():
     conn = get_connection()
     cursor = conn.cursor(as_dict=True)
@@ -62,16 +63,23 @@ def load_schema():
         WHERE TABLE_NAME NOT LIKE 'sys%'
         ORDER BY TABLE_NAME, ORDINAL_POSITION
     """)
-    
     schema = {}
     for row in cursor.fetchall():
         table = row.get('TABLE_NAME', '').strip()
         column = row.get('COLUMN_NAME', '').strip()
         if table and column:
             schema.setdefault(table, []).append(column)
-    
     conn.close()
     return schema
+
+# FIXED execute_sql()
+def execute_sql(sql: str):
+    validate_sql(sql)
+    conn = get_connection()
+    cursor = conn.cursor(as_dict=True)  # Dict cursor here too
+    cursor.execute(sql)
+    return cursor.fetchall()  # Already dicts, no unpacking needed
+
 
 
 
@@ -209,6 +217,7 @@ if __name__ == "__main__":
             print(f"\n❌ Error: {e}")
             import traceback
             traceback.print_exc()
+
 
 
 
