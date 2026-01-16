@@ -1,4 +1,4 @@
-import pymssql  # ✅ Using pymssql as requested
+import pymssql
 import re
 import json
 from datetime import date, datetime
@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 import os
 
 # =========================================================
-# CONFIG - FIXED FOR RAILWAY
-# ========================================================
+# CONFIG - RAILWAY READY
+# =========================================================
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -20,12 +20,17 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 FORBIDDEN_SQL_PATTERN = r"\b(insert|update|delete|drop|alter|truncate|exec|merge|create)\b"
 
+# Initialize Groq client
 client = Groq(api_key=GROQ_API_KEY)
 
 # =========================================================
 # GROQ CLIENT
 # =========================================================
 def groq_call(prompt, temperature=0):
+    """Call Groq API with error handling"""
+    if not GROQ_API_KEY:
+        raise ValueError("GROQ_API_KEY not set")
+    
     response = client.chat.completions.create(
         model=MODEL_NAME,
         temperature=temperature,
@@ -37,9 +42,13 @@ def groq_call(prompt, temperature=0):
     return response.choices[0].message.content.strip()
 
 # =========================================================
-# DATABASE CONNECTION - FIXED FOR pymssql + RAILWAY
+# DATABASE CONNECTION - pymssql RAILWAY READY
 # =========================================================
 def get_connection():
+    """Create pymssql connection with Railway compatibility"""
+    if not all([DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME]):
+        raise ValueError("Missing DB credentials in environment")
+    
     return pymssql.connect(
         server=DB_SERVER,
         user=DB_USER,
@@ -51,69 +60,73 @@ def get_connection():
     )
 
 # =========================================================
-# LOAD SCHEMA - FIXED UNPACKING ERROR
+# SCHEMA & SQL OPERATIONS - ERROR FREE
 # =========================================================
-# FIXED load_schema()
 def load_schema():
-    conn = get_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("""
-        SELECT TABLE_NAME, COLUMN_NAME
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_NAME NOT LIKE 'sys%'
-        ORDER BY TABLE_NAME, ORDINAL_POSITION
-    """)
-    schema = {}
-    for row in cursor.fetchall():
-        table = row.get('TABLE_NAME', '').strip()
-        column = row.get('COLUMN_NAME', '').strip()
-        if table and column:
-            schema.setdefault(table, []).append(column)
-    conn.close()
-    return schema
+    """Load database schema safely"""
+    conn = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT TABLE_NAME, COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME NOT LIKE 'sys%'
+            ORDER BY TABLE_NAME, ORDINAL_POSITION
+        """)
+        
+        schema = {}
+        for table_name, column_name in cursor.fetchall():
+            table = table_name.strip()
+            column = column_name.strip()
+            if table and column:
+                schema.setdefault(table, []).append(column)
+        return schema
+        
+    finally:
+        if conn:
+            conn.close()
 
-# FIXED execute_sql()
-def execute_sql(sql: str):
-    validate_sql(sql)
-    conn = get_connection()
-    cursor = conn.cursor(as_dict=True)  # Dict cursor here too
-    cursor.execute(sql)
-    return cursor.fetchall()  # Already dicts, no unpacking needed
-
-
-
-
-
-
-# =========================================================
-# SANITIZE SQL
-# =========================================================
 def sanitize_sql(sql: str) -> str:
+    """Remove markdown formatting from SQL"""
     sql = re.sub(r"```sql|```", "", sql, flags=re.IGNORECASE)
     sql = sql.replace("`", "").strip()
     return sql
 
-# =========================================================
-# VALIDATE SQL
-# =========================================================
 def validate_sql(sql: str):
+    """Ensure only safe SELECT queries"""
     sql_lower = sql.lower().strip()
     if not sql_lower.startswith("select"):
         raise ValueError("Only SELECT queries allowed")
     if re.search(FORBIDDEN_SQL_PATTERN, sql_lower):
         raise ValueError("Unsafe SQL detected")
 
+def execute_sql(sql: str):
+    """Execute SQL safely with dict cursor"""
+    validate_sql(sql)
+    conn = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(as_dict=True)  # Returns dicts directly
+        cursor.execute(sql)
+        return cursor.fetchall()  # Already list of dicts
+    finally:
+        if conn:
+            conn.close()
+
 # =========================================================
 # SQL GENERATION
 # =========================================================
 def generate_sql(question: str, schema: dict) -> str:
+    """Generate safe SQL from natural language"""
     schema_text = "\n".join(f"{table}({', '.join(cols)})" for table, cols in schema.items())
+    
     prompt = f"""
 You are an expert SQL Server developer.
 
 Task:
-- Generate a fully correct SELECT query for the user question.
-- Include in SELECT all columns that are used in WHERE, JOIN, GROUP BY, ORDER BY
+- Generate a fully correct SELECT query for the user question
+- Include in SELECT all columns used in WHERE, JOIN, GROUP BY, ORDER BY
 - Always use LEFT JOIN for related tables unless filtering requires INNER JOIN
 - Use dbo.TableName syntax
 - Do not invent any column names
@@ -125,30 +138,19 @@ Database Schema:
 User Question:
 {question}
 
-Return ONLY the raw SQL.
+Return ONLY the raw SQL query. No explanations.
 """
+    
     raw_sql = groq_call(prompt, temperature=0)
     sql = sanitize_sql(raw_sql)
     validate_sql(sql)
     return sql
 
 # =========================================================
-# SQL EXECUTION - FIXED FOR pymssql
-# =========================================================
-def execute_sql(sql: str):
-    validate_sql(sql)
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(sql)
-    cols = [desc[0] for desc in cursor.description]
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(zip(cols, row)) for row in rows]
-
-# =========================================================
-# EXPERIENCE CALCULATION
+# BUSINESS LOGIC
 # =========================================================
 def calculate_experience(joining_date):
+    """Calculate years/months experience"""
     if not joining_date:
         return "N/A"
     if isinstance(joining_date, datetime):
@@ -159,35 +161,41 @@ def calculate_experience(joining_date):
     months = (delta.days % 365) // 30
     return f"{years} years {months} months"
 
-# =========================================================
-# HUMAN READABLE ANSWER
-# =========================================================
 def generate_answer(question: str, data: list):
+    """Convert raw data to human readable answer"""
     prompt = f"""
 You are a senior HR assistant.
 
-Question:
-{question}
+Question: {question}
 
-Database Result:
-{json.dumps(data, default=str)}
+Database Result: {json.dumps(data, default=str, indent=2)}
 
 Rules:
 - Give concise, human-readable answers
-- If multiple rows, use numbered list
-- Include experience where relevant
-- Do not invent data
+- If multiple rows, use numbered list format
+- Include experience calculations where relevant  
+- Do not invent or assume data
+- Be professional and precise
 """
     return groq_call(prompt)
 
 # =========================================================
-# FULL PIPELINE
+# MAIN PIPELINE
 # =========================================================
 def ask_hr_bot(question: str):
+    """Complete HR bot pipeline"""
+    print("⏳ Loading schema...")
     schema = load_schema()
+    
+    print("⏳ Generating SQL...")
     sql = generate_sql(question, schema)
+    
+    print("⏳ Executing query...")
     data = execute_sql(sql)
+    
+    print("⏳ Generating answer...")
     answer = generate_answer(question, data)
+    
     return {
         "sql": sql,
         "answer": answer,
@@ -195,31 +203,44 @@ def ask_hr_bot(question: str):
     }
 
 # =========================================================
-# CLI + RAILWAY READY
+# CLI INTERFACE
 # =========================================================
 if __name__ == "__main__":
     print("🤖 Expert HR Chatbot (Groq + pymssql + SQL Server)")
-    print("Type 'exit' to quit")
+    print("✅ Railway deployment ready")
+    print("Type 'exit' to quit\n")
     
     while True:
-        q = input("\nAsk HR: ")
-        if q.lower() in ("exit", "quit"):
-            break
         try:
-            res = ask_hr_bot(q)
-            print("\n🧠 SQL Generated:")
-            print(res["sql"])
+            question = input("Ask HR: ").strip()
+            if question.lower() in ("exit", "quit"):
+                print("👋 Goodbye!")
+                break
+                
+            if not question:
+                continue
+                
+            result = ask_hr_bot(question)
+            
+            print("\n" + "="*60)
+            print("🧠 SQL Generated:")
+            print("-" * 40)
+            print(result["sql"])
             print("\n🤖 HR Answer:")
-            print(res["answer"])
-            print("\n📊 Raw Data:")
-            print(json.dumps(res["raw_data"], indent=2, default=str))
+            print("-" * 40)
+            print(result["answer"])
+            print("\n📊 Raw Data Preview:")
+            print("-" * 40)
+            for i, row in enumerate(result["raw_data"][:3]):  # First 3 rows
+                print(f"{i+1}. {json.dumps(row, default=str)}")
+            if len(result["raw_data"]) > 3:
+                print(f"... and {len(result['raw_data'])-3} more rows")
+            print("="*60 + "\n")
+            
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
+            break
         except Exception as e:
-            print(f"\n❌ Error: {e}")
+            print(f"\n❌ Error: {str(e)}")
             import traceback
             traceback.print_exc()
-
-
-
-
-
-
