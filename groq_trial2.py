@@ -63,21 +63,29 @@ def load_schema():
         ORDER BY TABLE_NAME, ORDINAL_POSITION
     """)
     
-    # Get column names from cursor description
-    cols = [desc[0] for desc in cursor.description]
-    print(f"DEBUG: Cursor columns: {cols}")
-    
     schema = {}
     rows = cursor.fetchall()
     
-    for row in rows:
-        # Map by column position using cursor description
-        table = row[0]  # Always TABLE_NAME (index 0)
-        column = row[1] # Always COLUMN_NAME (index 1)
-        schema.setdefault(table, []).append(column)
+    print(f"DEBUG: Found {len(rows)} rows")  # Add this line
+    
+    for i, row in enumerate(rows):
+        try:
+            # ULTRA SAFE: Handle any row length
+            if len(row) >= 2:
+                table = str(row[0]).strip()
+                column = str(row[1]).strip()
+                if table and column:  # Only add non-empty values
+                    schema.setdefault(table, []).append(column)
+            else:
+                print(f"WARNING: Row {i} too short: {row}")
+        except Exception as e:
+            print(f"WARNING: Error processing row {i}: {e}, row={row}")
+            continue
     
     conn.close()
+    print(f"SUCCESS: Loaded {len(schema)} tables")
     return schema
+
 
 
 
@@ -214,6 +222,7 @@ if __name__ == "__main__":
             print(f"\n❌ Error: {e}")
             import traceback
             traceback.print_exc()
+
 
 
 
