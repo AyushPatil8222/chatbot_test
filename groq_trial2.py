@@ -63,17 +63,22 @@ def load_schema():
         ORDER BY TABLE_NAME, ORDINAL_POSITION
     """)
     
+    # Get column names from cursor description
+    cols = [desc[0] for desc in cursor.description]
+    print(f"DEBUG: Cursor columns: {cols}")
+    
     schema = {}
     rows = cursor.fetchall()
     
-    # 🔥 BULLETPROOF: NO UNPACKING - Use list slicing
     for row in rows:
-        table = row[0]   # First column
-        column = row[1]  # Second column  
+        # Map by column position using cursor description
+        table = row[0]  # Always TABLE_NAME (index 0)
+        column = row[1] # Always COLUMN_NAME (index 1)
         schema.setdefault(table, []).append(column)
     
     conn.close()
     return schema
+
 
 
 
@@ -209,5 +214,6 @@ if __name__ == "__main__":
             print(f"\n❌ Error: {e}")
             import traceback
             traceback.print_exc()
+
 
 
