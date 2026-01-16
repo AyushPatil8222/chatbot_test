@@ -62,14 +62,19 @@ def load_schema():
         WHERE TABLE_NAME NOT LIKE 'sys%'
         ORDER BY TABLE_NAME, ORDINAL_POSITION
     """)
-    schema = {}
     
-    # ✅ FIXED: Explicit tuple unpacking
-    for (table, column) in cursor.fetchall():
+    schema = {}
+    rows = cursor.fetchall()
+    
+    # 🔥 BULLETPROOF: NO UNPACKING - Use list slicing
+    for row in rows:
+        table = row[0]   # First column
+        column = row[1]  # Second column  
         schema.setdefault(table, []).append(column)
     
     conn.close()
     return schema
+
 
 
 # =========================================================
@@ -204,4 +209,5 @@ if __name__ == "__main__":
             print(f"\n❌ Error: {e}")
             import traceback
             traceback.print_exc()
+
 
