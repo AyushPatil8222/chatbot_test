@@ -1,0 +1,48 @@
+/* Global dark theme */
+body {
+  background: linear-gradient(135deg, #0b0f19, #0f172a);
+  color: #e5e7eb;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+/* Sidebar */
+.chainlit-sidebar {
+  background: #0b1220 !important;
+  border-right: 1px solid #1f2937;
+}
+
+/* Main content cards */
+.chainlit-message {
+  background: #0f172a;
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  margin-bottom: 14px;
+}
+
+/* Headers */
+h2, h3 {
+  color: #60a5fa;
+}
+
+/* Buttons */
+button {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-radius: 10px;
+  border: none;
+  padding: 10px 16px;
+  color: white;
+  font-weight: 600;
+}
+
+/* Steps */
+.chainlit-step {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+}
+
+/* Hide footer */
+.chainlit-footer {
+  display: none;
+}
