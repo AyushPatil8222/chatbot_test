@@ -1,5 +1,0 @@
-chainlit
-groq
-pymssql
-python-dotenv
-railway up
